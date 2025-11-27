@@ -1,0 +1,274 @@
+@page "/patients"
+@inject PatientService PatientService
+@rendermode InteractiveServer
+
+<PageTitle>Patient Management</PageTitle>
+
+<div class="container-fluid mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Patient Management System</h1>
+        @if (!showForm)
+        {
+            <button class="btn btn-success" @onclick="ShowForm">
+                <span class="bi bi-plus-circle"></span> Add New Patient
+            </button>
+        }
+    </div>
+
+    @if (showForm)
+    {
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">@(isEditing ? "Edit Patient" : "Add New Patient")</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="patientForm" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="name" class="form-label">Full Name <span class="text-danger">*</span></label>
+                            <InputText 
+                                id="name" 
+                                class="form-control" 
+                                @bind-Value="patientForm.Name"
+                                placeholder="Enter patient's full name" />
+                            <ValidationMessage For="@(() => patientForm.Name)" class="text-danger small" />
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="dob" class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                            <InputDate 
+                                id="dob" 
+                                class="form-control" 
+                                @bind-Value="patientForm.DateOfBirth" />
+                            <ValidationMessage For="@(() => patientForm.DateOfBirth)" class="text-danger small" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="contact" class="form-label">Contact Info <span class="text-danger">*</span></label>
+                            <InputText 
+                                id="contact" 
+                                class="form-control" 
+                                @bind-Value="patientForm.ContactInfo"
+                                placeholder="Phone number or email" />
+                            <ValidationMessage For="@(() => patientForm.ContactInfo)" class="text-danger small" />
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="mrn" class="form-label">Medical Record Number <span class="text-danger">*</span></label>
+                            <InputText 
+                                id="mrn" 
+                                class="form-control" 
+                                @bind-Value="patientForm.MedicalRecordNumber" 
+                                disabled="@isEditing"
+                                placeholder="Auto-generated if left empty" />
+                            @if (!isEditing)
+                            {
+                                <small class="form-text text-muted">Leave empty for auto-generation</small>
+                            }
+                            <ValidationMessage For="@(() => patientForm.MedicalRecordNumber)" class="text-danger small" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="bi bi-check-circle"></span> Save Patient
+                        </button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit">
+                            <span class="bi bi-x-circle"></span> Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    @if (patients != null && patients.Count > 0)
+    {
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Registered Patients (@patients.Count)</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Date of Birth</th>
+                                <th>Age</th>
+                                <th>Contact Info</th>
+                                <th>Medical Record #</th>
+                                <th class="text-center" style="width: 150px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var patient in patients)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>@patient.Name</strong>
+                                    </td>
+                                    <td>@patient.DateOfBirth.ToString("yyyy-MM-dd")</td>
+                                    <td>
+                                        @{
+                                            int age = DateTime.Now.Year - patient.DateOfBirth.Year;
+                                            if (patient.DateOfBirth.Date > DateTime.Now.AddYears(-age)) age--;
+                                        }
+                                        @age years
+                                    </td>
+                                    <td>@patient.ContactInfo</td>
+                                    <td>
+                                        <span class="badge bg-info">@patient.MedicalRecordNumber</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-outline-info" @onclick="() => EditPatient(patient)" title="Edit Patient">
+                                            <span class="bi bi-pencil"></span> Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(patient)" title="Delete Patient">
+                                            <span class="bi bi-trash"></span> Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else if (patients != null)
+    {
+        <div class="alert alert-info">
+            <span class="bi bi-info-circle"></span> No patients registered yet. Click "Add New Patient" to get started.
+        </div>
+    }
+</div>
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteModal)
+{
+    <div class="modal d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Delete Patient</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete <strong>@deletePatientName</strong>?</p>
+                    <p class="text-danger">This action cannot be undone. All associated transactions will also be deleted.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteAction">
+                        <span class="bi bi-trash"></span> Delete Patient
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Patient> patients = new();
+    private Patient patientForm = new();
+    private bool showForm = false;
+    private bool isEditing = false;
+    private int editingPatientId = 0;
+
+    private bool showDeleteModal = false;
+    private int deletePatientId = 0;
+    private string deletePatientName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPatients();
+    }
+
+    private async Task LoadPatients()
+    {
+        patients = await PatientService.GetAllPatientsAsync();
+    }
+
+    private void ShowForm()
+    {
+        patientForm = new Patient 
+        { 
+            DateOfBirth = DateTime.Now.AddYears(-30) // Default to 30 years ago
+        };
+        showForm = true;
+        isEditing = false;
+    }
+
+    private void EditPatient(Patient patient)
+    {
+        patientForm = new Patient
+        {
+            PatientId = patient.PatientId,
+            Name = patient.Name,
+            DateOfBirth = patient.DateOfBirth,
+            ContactInfo = patient.ContactInfo,
+            MedicalRecordNumber = patient.MedicalRecordNumber
+        };
+        editingPatientId = patient.PatientId;
+        showForm = true;
+        isEditing = true;
+    }
+
+    private async Task HandleSubmit()
+    {
+        try
+        {
+            if (isEditing)
+            {
+                await PatientService.UpdatePatientAsync(editingPatientId, patientForm);
+            }
+            else
+            {
+                await PatientService.CreatePatientAsync(patientForm);
+            }
+
+            CancelEdit();
+            await LoadPatients();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    private void CancelEdit()
+    {
+        patientForm = new Patient();
+        showForm = false;
+        isEditing = false;
+    }
+
+    private void ConfirmDelete(Patient patient)
+    {
+        deletePatientId = patient.PatientId;
+        deletePatientName = patient.Name;
+        showDeleteModal = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteModal = false;
+        deletePatientId = 0;
+        deletePatientName = "";
+    }
+
+    private async Task ConfirmDeleteAction()
+    {
+        if (await PatientService.DeletePatientAsync(deletePatientId))
+        {
+            CancelDelete();
+            await LoadPatients();
+        }
+    }
+}

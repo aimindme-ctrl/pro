@@ -1,0 +1,282 @@
+@page "/transactions"
+@inject TransactionService TransactionService
+@inject PatientService PatientService
+@rendermode InteractiveServer
+
+<PageTitle>Transactions</PageTitle>
+
+<div class="container-fluid mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">All Transactions</h1>
+        <button class="btn btn-success" @onclick="ShowAddForm">
+            <span class="bi bi-plus-circle"></span> Add New Transaction
+        </button>
+    </div>
+
+    @if (showAddForm)
+    {
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Add New Transaction</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="transactionForm" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Patient <span class="text-danger">*</span></label>
+                            <select class="form-select" @onchange="HandlePatientChange">
+                                <option value="0">-- Select Patient --</option>
+                                @if (patients != null)
+                                {
+                                    @foreach (var p in patients)
+                                    {
+                                        <option value="@p.PatientId" selected="@(transactionForm.PatientId == p.PatientId)">@p.Name (MRN: @p.MedicalRecordNumber)</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Service Type <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="transactionForm.ServiceType" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <InputNumber class="form-control" @bind-Value="transactionForm.Amount" />
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Transaction Date <span class="text-danger">*</span></label>
+                            <InputDate class="form-control" @bind-Value="transactionForm.TransactionDate" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Status <span class="text-danger">*</span></label>
+                            <select class="form-select" @onchange="HandleStatusChange">
+                                <option value="Unpaid" selected>Unpaid</option>
+                                <option value="Paid">Paid</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@(transactionForm.PatientId == 0)">Save</button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelAdd">Cancel</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    @if (transactions != null && transactions.Count > 0)
+    {
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Patient Name</th>
+                                <th>Service Type</th>
+                                <th>Amount</th>
+                                <th>Transaction Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var transaction in transactions)
+                            {
+                                <tr>
+                                    <td><strong>@transaction.Patient?.Name</strong></td>
+                                    <td>@transaction.ServiceType</td>
+                                    <td class="fw-bold">$@transaction.Amount.ToString("F2")</td>
+                                    <td>@transaction.TransactionDate.ToString("yyyy-MM-dd")</td>
+                                    <td>
+                                        <span class="badge @(transaction.Status == "Paid" ? "bg-success" : "bg-warning text-dark")">
+                                            @transaction.Status
+                                        </span>
+                                    </td>
+                                    <td class="text-center" style="width:160px;">
+                                        <button class="btn btn-sm btn-outline-info me-1" @onclick="() => EditTransaction(transaction)">
+                                            <span class="bi bi-pencil"></span> Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(transaction)">
+                                            <span class="bi bi-trash"></span> Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else if (transactions != null)
+    {
+        <div class="alert alert-info">
+            <span class="bi bi-info-circle"></span> No transactions recorded yet.
+        </div>
+    }
+</div>
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteModal)
+{
+    <div class="modal d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Delete Transaction</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this transaction?</p>
+                    <div class="alert alert-info">
+                        <strong>@deleteTransactionPatient</strong> - @deleteTransactionService<br/>
+                        Amount: <strong>${{deleteTransactionAmount:F2}}</strong> | Date: <strong>@deleteTransactionDate</strong>
+                    </div>
+                    <p class="text-danger">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteAction">
+                        <span class="bi bi-trash"></span> Delete Transaction
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Transaction> transactions = new();
+    private bool showAddForm = false;
+    private bool isEditing = false;
+    private int editingTransactionId = 0;
+    private Transaction transactionForm = new Transaction();
+    private List<Patient> patients = new();
+
+    // Delete modal state
+    private bool showDeleteModal = false;
+    private int deleteTransactionId = 0;
+    private string deleteTransactionPatient = "";
+    private string deleteTransactionService = "";
+    private decimal deleteTransactionAmount = 0;
+    private string deleteTransactionDate = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        transactions = await TransactionService.GetAllTransactionsAsync();
+        patients = await PatientService.GetAllPatientsAsync();
+    }
+
+    private void ShowAddForm()
+    {
+        transactionForm = new Transaction { TransactionDate = DateTime.Now, Status = "Unpaid" };
+        isEditing = false;
+        editingTransactionId = 0;
+        showAddForm = true;
+    }
+
+    private void CancelAdd()
+    {
+        showAddForm = false;
+        transactionForm = new Transaction();
+        isEditing = false;
+        editingTransactionId = 0;
+    }
+
+    private void HandlePatientChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+            transactionForm.PatientId = id;
+    }
+
+    private void HandleStatusChange(ChangeEventArgs e)
+    {
+        transactionForm.Status = e.Value?.ToString() ?? "Unpaid";
+    }
+
+    private async Task HandleSubmit()
+    {
+        try
+        {
+            if (isEditing && editingTransactionId > 0)
+            {
+                await TransactionService.UpdateTransactionAsync(editingTransactionId, transactionForm);
+            }
+            else
+            {
+                await TransactionService.CreateTransactionAsync(transactionForm);
+            }
+
+            showAddForm = false;
+            isEditing = false;
+            editingTransactionId = 0;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error creating/updating transaction: {ex.Message}");
+        }
+    }
+
+    private void EditTransaction(Transaction t)
+    {
+        transactionForm = new Transaction
+        {
+            TransactionId = t.TransactionId,
+            PatientId = t.PatientId,
+            ServiceType = t.ServiceType,
+            Amount = t.Amount,
+            TransactionDate = t.TransactionDate,
+            Status = t.Status
+        };
+        isEditing = true;
+        editingTransactionId = t.TransactionId;
+        showAddForm = true;
+    }
+
+    private void ConfirmDelete(Transaction t)
+    {
+        deleteTransactionId = t.TransactionId;
+        deleteTransactionPatient = t.Patient?.Name ?? "Unknown";
+        deleteTransactionService = t.ServiceType;
+        deleteTransactionAmount = t.Amount;
+        deleteTransactionDate = t.TransactionDate.ToString("yyyy-MM-dd");
+        showDeleteModal = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteModal = false;
+        deleteTransactionId = 0;
+        deleteTransactionPatient = string.Empty;
+        deleteTransactionService = string.Empty;
+        deleteTransactionAmount = 0;
+        deleteTransactionDate = string.Empty;
+    }
+
+    private async Task ConfirmDeleteAction()
+    {
+        if (await TransactionService.DeleteTransactionAsync(deleteTransactionId))
+        {
+            CancelDelete();
+            await LoadData();
+        }
+    }
+}
+  
