@@ -224,4 +224,5 @@ C:\Users\rays\pro\MyApp\obj\Debug\net10.0\refint\MyApp.dll
 C:\Users\rays\pro\MyApp\obj\Debug\net10.0\MyApp.pdb
 C:\Users\rays\pro\MyApp\obj\Debug\net10.0\MyApp.genruntimeconfig.cache
 C:\Users\rays\pro\MyApp\obj\Debug\net10.0\ref\MyApp.dll
-C:\Users\rays\pro\MyApp\obj\Debug\net10.0\compressed\90nu9eoixb-{0}-cd389qgqsd-cd389qgqsd.gz
+C:\Users\rays\pro\MyApp\obj\Debug\net10.0\MyApp.sourcelink.json
+C:\Users\rays\pro\MyApp\obj\Debug\net10.0\compressed\90nu9eoixb-{0}-d6y0sh0ihv-d6y0sh0ihv.gz

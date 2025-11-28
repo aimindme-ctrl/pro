@@ -2,6 +2,7 @@
 @inject TransactionService TransactionService
 @inject IJSRuntime JSRuntime
 @rendermode InteractiveServer
+@using MyApp.Models
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -51,13 +52,54 @@
             </div>
         </div>
 
-        <!-- Monthly Trends Chart -->
-        <div class="card shadow mb-5">
-            <div class="card-header bg-light">
-                <h5 class="mb-0">Monthly Revenue Trend (Last 12 Months)</h5>
+        <!-- Monthly Trends Chart + Recent Transactions -->
+        <div class="row mb-5">
+            <div class="col-md-8">
+                <div class="card shadow mb-5">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Monthly Revenue Trend (Last 12 Months)</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="monthlyRevenueChart" style="height: 300px;"></canvas>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <canvas id="monthlyRevenueChart" style="height: 300px;"></canvas>
+
+            <div class="col-md-4">
+                <div class="card shadow mb-5">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Recent Transactions</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="list-group list-group-flush">
+                            @if (recentTransactions == null || recentTransactions.Count == 0)
+                            {
+                                <li class="list-group-item">No recent transactions.</li>
+                            }
+                            else
+                            {
+                                foreach (var t in recentTransactions)
+                                {
+                                    <li class="list-group-item">
+                                        <div class="d-flex justify-content-between">
+                                            <div>
+                                                <div class="fw-semibold">@t.Patient?.Name ?? "Unknown Patient"</div>
+                                                <div class="text-muted small">@t.ServiceType • @t.TransactionDate.ToString("yyyy-MM-dd")</div>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="fw-bold">$@t.Amount.ToString("F2")</div>
+                                                <div class="small text-@((t.Status == "Paid") ? "success" : "warning")">@t.Status</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                }
+                            }
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <a href="/transactions" class="btn btn-link">View all transactions</a>
+                    </div>
+                </div>
             </div>
         </div>
     }
@@ -76,6 +118,7 @@
     private int totalTransactions = 0;
     private decimal totalRevenue = 0;
     private Dictionary<string, decimal> monthlyRevenue = new();
+    private List<Transaction> recentTransactions = new();
     private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
@@ -99,8 +142,23 @@
             totalTransactions = await TransactionService.GetTotalTransactionsCountAsync();
             totalRevenue = await TransactionService.GetTotalRevenueAsync();
             monthlyRevenue = await TransactionService.GetMonthlyRevenueAsync(12);
+            // Load recent transactions for the recent transactions box
+            recentTransactions = await TransactionService.GetRecentTransactionsAsync(7);
             isLoading = false;
             StateHasChanged();
+
+            // Ensure chart is initialized/updated after data loads
+            if (monthlyRevenue != null && monthlyRevenue.Count > 0)
+            {
+                try
+                {
+                    await InitializeChart();
+                }
+                catch (Exception jsEx)
+                {
+                    Console.WriteLine($"Chart initialization failed: {jsEx.Message}");
+                }
+            }
         }
         catch (Exception ex)
         {

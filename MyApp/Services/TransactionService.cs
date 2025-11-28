@@ -173,14 +173,19 @@ namespace MyApp.Services
         // Dashboard - Get monthly revenue trend for the last N months
         public async Task<Dictionary<string, decimal>> GetMonthlyRevenueAsync(int months = 12)
         {
-            var startDate = DateTime.UtcNow.AddMonths(-months);
-            
-            // Fetch all transactions for the period (bring to client for grouping)
+            if (months <= 0) months = 12;
+
+            // Determine the first month to include (start of month), include current month as the last
+            var now = DateTime.UtcNow;
+            var startMonth = new DateTime(now.Year, now.Month, 1).AddMonths(-(months - 1));
+            var endMonth = new DateTime(now.Year, now.Month, 1);
+
+            // Fetch transactions that fall within the inclusive month range
             var transactions = await _context.Transactions
-                .Where(t => t.TransactionDate >= startDate)
+                .Where(t => t.TransactionDate >= startMonth && t.TransactionDate < endMonth.AddMonths(1))
                 .ToListAsync();
 
-            // Group on client side
+            // Group on client side by Year+Month
             var monthlyData = transactions
                 .GroupBy(t => new { t.TransactionDate.Year, t.TransactionDate.Month })
                 .Select(g => new
@@ -188,22 +193,16 @@ namespace MyApp.Services
                     YearMonth = new DateTime(g.Key.Year, g.Key.Month, 1),
                     Total = g.Sum(t => t.Amount)
                 })
-                .OrderBy(x => x.YearMonth)
-                .ToList();
+                .ToDictionary(x => x.YearMonth, x => x.Total);
 
-            // Generate all months in range, filling gaps with 0
+            // Build result for exactly `months` months in order
             var result = new Dictionary<string, decimal>();
-            var currentMonth = startDate.AddMonths(-(startDate.Day - 1)).AddHours(-startDate.Hour).AddMinutes(-startDate.Minute).AddSeconds(-startDate.Second);
-            var endMonth = DateTime.UtcNow;
-
-            while (currentMonth <= endMonth)
+            for (var i = 0; i < months; i++)
             {
-                var key = currentMonth.ToString("MMM yyyy");
-                var total = monthlyData
-                    .FirstOrDefault(m => m.YearMonth.Year == currentMonth.Year && m.YearMonth.Month == currentMonth.Month)
-                    ?.Total ?? 0;
+                var monthDate = startMonth.AddMonths(i);
+                var key = monthDate.ToString("MMM yyyy");
+                monthlyData.TryGetValue(monthDate, out var total);
                 result[key] = total;
-                currentMonth = currentMonth.AddMonths(1);
             }
 
             return result;

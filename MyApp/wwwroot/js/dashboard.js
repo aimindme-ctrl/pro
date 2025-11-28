@@ -2,14 +2,25 @@
 
 window.initializeMonthlyTrendChart = function(labels, data) {
     const ctx = document.getElementById('monthlyRevenueChart').getContext('2d');
-    
-    new Chart(ctx, {
+
+    // Convert incoming data to numbers (Chart.js expects numeric values)
+    const numericData = data.map(d => Number(d) || 0);
+
+    // If chart already exists, update its data and re-render
+    if (window._monthlyRevenueChart) {
+        window._monthlyRevenueChart.data.labels = labels;
+        window._monthlyRevenueChart.data.datasets[0].data = numericData;
+        window._monthlyRevenueChart.update();
+        return;
+    }
+
+    window._monthlyRevenueChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
                 label: 'Revenue',
-                data: data,
+                data: numericData,
                 borderColor: '#198754',
                 backgroundColor: 'rgba(25, 135, 84, 0.1)',
                 borderWidth: 3,
